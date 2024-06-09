@@ -25,3 +25,6 @@
 - DOMAIN-KEYWORD,apqa.cn,🐟 漏网之鱼
 - DOMAIN-SUFFIX,raw.fastgit.org,🐟 漏网之鱼
 - DOMAIN-SUFFIX,curl.se,🐟 漏网之鱼
+- DOMAIN-SUFFIX,docker.com,♻️ 自动选择
+- DOMAIN-SUFFIX,hub.docker.com,♻️ 自动选择
+- DOMAIN-SUFFIX,docker.io,♻️ 自动选择

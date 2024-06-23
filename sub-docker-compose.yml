@@ -1,0 +1,41 @@
+version: '3.1'
+#20240324修改 https://imgki.com/archives/718.html
+
+services:
+ 
+  subconverter:
+    #image: tindy2013/subconverter:latest  #当前版本0.81 
+    build: ./subconverter/scripts  # commit eef532850633b8d8266240ddb611a14397b2fff7
+    container_name: subconverter
+    restart: always
+    ports:
+      - 25500:25500
+
+  subweb:
+    build: ./sub-web   # commit e06b3ed3dc4680e0b4ddbfb592b4ae173a6318dd
+    container_name: sub-web-imgki
+    restart: always
+    ports:
+      - 5080:80
+  
+  myurls:
+    build: ./myurls                  # commit 74c886f8c2b2bc111f01d2cac09f4bfdf14dd3e3
+    container_name: myurls
+    restart: always
+    #env_file: .env
+    ports:
+      - "5081:8080"
+    volumes:
+      - ./myurls/logs:/app/logs  
+    depends_on:
+      - myurls-redis
+    entrypoint: ["/app/myurls", "-domain", "i.2z.pw", "-conn", myurls-redis:6379]
+
+  myurls-redis:
+    image: "redis:7"
+    container_name: myurls-redis
+    restart: always
+    volumes:
+      - ./data/redis:/data
+    expose:
+      - "6379"

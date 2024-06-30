@@ -1,0 +1,490 @@
+lxc正常，armbian wifi感叹号 - 20240630
+https://github.com/axcsz/Collect/blob/master/Clash.Meta/mihomo.yaml
+
+#!name = mihomo 配置文件
+#!date = 2024-06-08 17:00
+#!source = https://wiki.metacubex.one/example/conf/#__tabbed_1_3
+#!author = axcsz
+
+
+######### 机场锚点 start #######
+# 机场订阅更新 & 延迟测试
+pr: &pr {type: http, interval: 3600, health-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}, proxy: 直连}
+
+######### 机场锚点 end #######
+
+# 机场订阅，名称不能重复
+proxy-providers:
+  # 机场1
+  Airport_01:
+    <<: *pr
+    url: "此处填写机场订阅连接"
+    override:
+      additional-prefix: "【机场名称】"
+  # 机场2
+  Airport_02:
+    <<: *pr
+    url: "此处填写机场订阅连接"
+    override:
+      additional-prefix: "【机场名称】"
+
+# 全局配置
+# 开启 IPv6 总开关，关闭阻断所有 IPv6 链接和屏蔽 DNS 请求 AAAA 记录
+ipv6: true
+# 运行模式：rule/global/direct
+## rule 规则匹配、global 全局代理、direct 全局直连
+mode: rule
+# UDP 开关
+udp: true
+# 日志输出：silent/error/warning/info/debug
+## silent 不输出、error 仅输出发生错误、warning 输出发生错误但不影响运行的日志、info 输出一般运行的内容、debug 全部内容
+log-level: info
+# 允许局域网的连接，可用来共享加速
+allow-lan: true
+# 混合端口 HTTP和SOCKS5用一个端口
+mixed-port: 7891
+# 更换延迟计算方式,去除握手等额外延迟
+unified-delay: false
+# TCP 并发连接所有 IP, 将使用最快握手的 TCP
+tcp-concurrent: true
+
+# UI 相关
+# 外部用户界面
+external-ui: ui
+# 外部控制器,可以使用 RESTful API 来控制你的 clash 内核
+external-controller: 0.0.0.0:9090
+# 自定义外部用户界面下载地址
+# external-ui-url: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+
+# 匹配所有进程（always/strict/off）
+## always 开启，强制匹配所有进程、 strict 默认，由 Clash 判断是否开启、 off 不匹配进程，推荐在路由器上使用此模式
+find-process-mode: strict
+# 全局 TLS 指纹，优先低于 proxy 内的 client-fingerprint（chrome, firefox, safari, iOS, android, edge, 360, qq, random）
+## 目前支持开启 TLS 传输的 TCP/grpc/WS/HTTP , 支持协议有 VLESS,Vmess 和 trojan.
+global-client-fingerprint: chrome
+
+# profile 应为扩展配置，但在 Clash.meta, 仅作为缓存项使用
+profile:
+  # 储存 API 对策略组的选择，以供下次启动时使用
+  store-selected: true
+  # 储存 fakeip 映射表，域名再次发生连接时，使用原有映射地址
+  store-fake-ip: true
+
+# 嗅探域名 可选配置
+sniffer:
+  enable: true
+# TLS 和 QUIC 默认如果不配置 ports 默认嗅探 443
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+# 需要跳过嗅探的域名
+  skip-classical:
+    - "Mijia Cloud"     # 米家设备，建议加
+    - "dlg.io.mi.com"
+    - "+.apple.com"     # 苹果域名，建议加
+
+# TUN配置
+tun:
+  enable: true
+# 可选： system/gvisor/mixed
+  stack: mixed
+# 需要劫持的 DNS
+  dns-hijack:
+    - "any:53"
+# 配置路由表
+  auto-route: true
+# 自动识别出口网卡
+  auto-detect-interface: true
+
+# DNS配置
+dns:
+# 关闭将使用系统 DNS
+  enable: true
+# 开启 DNS 服务器监听
+  listen: :53
+# DNS
+  ipv6: true
+# 模式：redir-host 或 fake-ip
+  enhanced-mode: fake-ip
+# Fake-IP解析地址池
+  fake-ip-range: 28.0.0.1/8
+# fake ip 白名单列表'以下地址不会下发fakeip映射用于连接
+  fake-ip-filter:
+    - "*"
+    - "+.lan"
+    - "+.local"
+# 只能使用纯 IP 地址，可使用加密 DNS
+  default-nameserver:
+    - 223.5.5.5
+    - 223.6.6.6
+# 这部分为主要 DNS 配置，影响所有直连，确保使用对大陆解析精准的 DNS
+  nameserver:
+    - https://223.5.5.5/dns-query#h3=true
+    - https://223.6.6.6/dns-query#h3=true
+
+# 单个出站节点
+proxies:
+  # 直连
+  - name: "直连"
+    type: direct
+    ip-version: ipv6-prefer
+    udp: true
+    tfo: true
+    mptcp: true
+  # 拦截
+  - name: "拦截"
+    type: reject
+
+######### 策略锚点 start #######
+# 策略组相关
+pg: &pg {type: select, proxies: [香港, 台湾, 美国, 狮城, 日本, 韩国, 其他]}
+
+# 手动选择策略
+mt: &mt {type: select, include-all-providers: true}
+
+# 自动优选策略
+at: &at {type: url-test, include-all-providers: true, url: https://www.gstatic.com/generate_204, tolerance: 10, interval: 300}
+
+######### 策略锚点 end #######
+
+# 策略组
+proxy-groups:
+  # 策略分组
+  - {name: 全球, <<: *pg}
+  - {name: 媒体, <<: *pg}
+  - {name: 谷歌, <<: *pg}
+  - {name: 微软, <<: *pg}
+  - {name: 社交, <<: *pg}
+  - {name: 智能, <<: *pg}
+  - {name: 游戏, <<: *pg}
+  - {name: 苹果, type: select, proxies: [直连, 全球]}
+  - {name: 国内, type: select, proxies: [直连, 全球]}
+  - {name: 兜底, type: select, proxies: [全球, 直连]}
+
+  # 优选分组
+  - {name: 香港, <<: *at, filter: "(?=.*(港|HK|(?i)Hong))^((?!(台|日|韩|新|深|美)).)*$"}
+  - {name: 台湾, <<: *at, filter: "(?=.*(台|TW|(?i)Taiwan))^((?!(港|日|韩|新|美)).)*$" }
+  - {name: 美国, <<: *at, filter: "(?=.*(美|US|(?i)States|America))^((?!(港|台|日|韩|新)).)*$"}
+  - {name: 狮城, <<: *at, filter: "(?=.*(新|狮|獅|SG|(?i)Singapore))^((?!(港|台|日|韩|美|西)).)*$"}
+  - {name: 日本, <<: *at, filter: "(?=.*(日|JP|(?i)Japan))^((?!(港|台|韩|新|美)).)*$" }
+  - {name: 韩国, <<: *at, filter: "(?=.*(韩|KR|(?i)Korea))^((?!(台|日|港|新|美)).)*$"}
+  - {name: 其他, <<: *mt, filter: "^(?!.*(港|台|日本|韩|坡|美|HK|US|TW|JP|KR|SG|Hong|Tai|Japan|Korea|Singapore|States))"}
+
+# 分流策略
+rules:
+  - RULE-SET,Adrules,拦截
+  - RULE-SET,AdBlock,拦截
+  - RULE-SET,AdsBlock,拦截
+  - RULE-SET,Game,游戏
+  - RULE-SET,OpenAI,智能
+  - RULE-SET,Twitter,社交
+  - RULE-SET,Facebook,社交
+  - RULE-SET,Telegram,社交
+  - RULE-SET,YouTube,谷歌
+  - RULE-SET,Google,谷歌
+  - RULE-SET,GitHub,微软
+  - RULE-SET,OneDrive,微软
+  - RULE-SET,Microsoft,微软
+  - RULE-SET,TikTok,媒体
+  - RULE-SET,Netflix,媒体
+  - RULE-SET,GlobalMedia,媒体
+  - RULE-SET,GlobalGFW,全球
+  - RULE-SET,Apple,苹果
+  - RULE-SET,Lan,国内
+  - RULE-SET,ChinaMedia,国内
+  - RULE-SET,China,国内
+  - GEOIP,CN,国内
+  - MATCH,兜底
+
+######### 规则锚点 #######
+rule-anchor:
+  # ipcidr 规则相关
+  i: &i {type: http, interval: 43200, behavior: ipcidr, format: text, proxy: 微软}
+
+  # domain 规则相关
+  d: &d {type: http, interval: 43200, behavior: domain, format: text, proxy: 微软}
+
+  # classical 规则相关
+  c: &c {type: http, interval: 43200, behavior: classical, format: text, proxy: 微软}
+
+######### 规则锚点 end #######
+
+# 规则集
+rule-providers:
+# domain 规则集
+  # 广告拦截
+  Adrules:
+    <<: *d
+    url: "https://adrules.top/adrules_domainset.txt"
+  AdBlock:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Block/AdBlock.list"
+  AdsBlock:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Block/AdsBlock.list"
+# 游戏平台
+  Game:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Game.list"
+# ChatGPT
+  OpenAI:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/OpenAI.list"
+# 谷歌服务
+  YouTube:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Media/YouTube.list"
+  Google:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Google.list"
+# 微软服务
+  GitHub:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/GitHub.list"
+  OneDrive:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/OneDrive.list"
+  Microsoft:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Microsoft.list"
+# 社交平台
+  Telegram:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Telegram.list"
+  Facebook:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Facebook.list"
+  Twitter:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Twitter.list"
+# 影视媒体
+  Netflix:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Media/Netflix.list"
+  TikTok:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Media/TikTok.list"
+  GlobalMedia:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Media/GlobalMedia.list"
+# 海外服务
+  GlobalGFW:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/GlobalGFW.list"
+# 苹果服务
+  Apple:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/Apple.list"
+# 国内服务
+  WeChat:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Other/WeChat.list"
+  ChinaMedia:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Media/ChinaMedia.list"
+  China:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Direct.list"
+# 本地/局域网
+  Lan:
+    <<: *c
+    url: "https://raw.githubusercontent.com/axcsz/Collect/master/Ruleset/Local.list"
+
+# script
+script:
+  # 使用 Python 表达式编写自定义规则
+  shortcuts: 
+    # 4483 与 9305 为 BiliBili 的 QUIC CDN
+    quic: network == 'udp' and (dst_port == 443 or dst_port == 4483 or dst_port == 9305)
+
+armbian wifi感叹号 - 20240630
+https://github.com/LennoC/Template4Clash/blob/main/%E6%9D%A5%E8%87%AAsurfing682%E7%89%88%E7%9A%84%E9%85%8D%E7%BD%AE%E5%8F%82%E8%80%83.yaml
+
+##
+#该配置来自于Android的Clash Magisk模块——Surfing，基于Clash4Magisk的改进模块。
+##
+mixed-port: 7890
+redir-port: 7891
+tproxy-port: 1536
+allow-lan: true
+mode: Rule
+geodata-mode: true
+unified-delay: true
+log-level: silent
+ipv6: true
+external-controller: 0.0.0.0:9090
+#面板默认Meta 可选Yacd 清除浏览器缓存即可重新加载
+external-ui: ./dashboard/Meta #Yacd
+secret: ""
+tcp-concurrent: true
+enable-process: true
+find-process-mode: strict
+global-client-fingerprint: chrome
+
+#####################
+#修改配置文件时，建议先停止模块服务，再进行保存.
+#####################
+
+geox-url:
+  geoip: "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+  geosite: "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
+  mmdb: "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/country.mmdb"
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+sniffer:
+  enable: true
+  sniff:
+    TLS:
+      ports: [443, 8443]
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+
+tun:
+  enable: false
+  device: tun0
+  stack: system
+  dns-hijack:
+    - 'any:53'
+    - 'tcp://any:53'
+  auto-route: true
+  auto-detect-interface: true
+  
+dns:
+  enable: true
+  prefer-h3: true
+  listen: 0.0.0.0:1053
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 28.0.0.1/8
+  fake-ip-filter:
+    - '*'
+    - '+.lan'
+    - 'connect.rom.miui.com'
+    - 'localhost.ptlogin2.qq.com'
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    
+  p: &p
+    {type: http, interval: 86400, health-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+  u: &u
+    use:
+    - 1.主要地址
+    - 2.备用地址
+
+proxy-providers:
+  1.主要地址:
+    <<: *p
+    url: "引入您的Clash订阅链接地址"
+    path: ./proxy_providers/subscribe1.yaml
+    #注意！如果您的订阅链接中带有“&”字符，请删掉.
+  2.备用地址:
+    <<: *p
+    url: "引入您的Clash订阅链接地址"
+    path: ./proxy_providers/subscribe2.yaml
+    #注意！如果您的订阅链接中带有“&”字符，请删掉.
+proxy-groups:
+  - {name: 🎯 总模式, type: select, proxies: [🚀 节点选择,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 🚀 节点选择, type: select, proxies: [♻️ 自动切换,🌎 全球直连], <<: *u}
+  - {name: ♻️ 自动切换, <<: *u, tolerance: 2, type: url-test}
+  - {name: ♻️ 手动切换1, type: select, proxies: [🚀 节点选择,🌎 全球直连], <<: *u}
+  - {name: ♻️ 手动切换2, type: select, proxies: [🚀 节点选择,🌎 全球直连], <<: *u}
+  - {name: ♻️ 手动切换3, type: select, proxies: [🚀 节点选择,🌎 全球直连], <<: *u}
+  - {name: 🤖 OpenAI, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 📲 电报信息, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 🎬 油管视频, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 📹 奈飞视频, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 📢 谷歌服务, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: Ⓜ️ 微软服务, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 🍎 苹果服务, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 🎮 Discord, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 📸 国际抖音, type: select, proxies: [🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3,🌎 全球直连]}
+  - {name: 📷 中国抖音, type: select, proxies: [🌎 全球直连,🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3]}
+  - {name: 🎹 网易音乐, type: select, proxies: [🌎 全球直连,🎯 总模式,♻️ 自动切换,♻️ 手动切换1,♻️ 手动切换2,♻️ 手动切换3]}
+  - {name: 🛑 广告拦截, type: select, proxies: [REJECT,🌎 全球直连]}
+  - {name: 🐋 漏网之鱼, type: select, proxies: [🎯 总模式,🌎 全球直连]}
+  - {name: 🌎 全球直连, type: select, proxies: [DIRECT]}
+rule-providers:
+  Telegram:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Telegram.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Telegram.yaml"
+    interval: 86400
+  Youtube:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Youtube.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Youtube.yaml"
+    interval: 86400
+  Google:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Google.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Google.yaml"
+    interval: 86400
+  Microsoft:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Microsoft.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Microsoft.yaml"
+    interval: 86400
+  Apple:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Apple.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Apple.yaml"
+    interval: 86400
+  Openai:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Openai.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Openai.yaml"
+    interval: 86400
+  Netflix:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Netflix.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Netflix.yaml"
+    interval: 86400
+  Discord:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./rule/Discord.yaml
+    url: "https://raw.githubusercontent.com/MoGuangYu/rules/main/Home/Discord.yaml"
+    interval: 86400
+rules:
+  - AND,((PROCESS-NAME,clash),(NOT,((IN-TYPE,inner)))),REJECT
+  - PROCESS-NAME,com.zhiliaoapp.musically,📸 国际抖音
+  - PROCESS-NAME,com.ss.android.ugc.aweme,📷 中国抖音
+  - PROCESS-NAME,com.netease.cloudmusic,🎹 网易音乐
+  - RULE-SET,Discord,🎮 Discord
+  - RULE-SET,Youtube,🎬 油管视频
+  - RULE-SET,Netflix,📹 奈飞视频
+  - RULE-SET,Google,📢 谷歌服务
+  - RULE-SET,Apple,🍎 苹果服务
+  - RULE-SET,Microsoft,Ⓜ️ 微软服务
+  - RULE-SET,Telegram,📲 电报信息
+  - RULE-SET,Openai,🤖 OpenAI
+  - GEOSITE,category-ads-all,🛑 广告拦截
+  - GEOSITE,CN,🌎 全球直连
+  - GEOIP,private,🌎 全球直连,no-resolve
+  - GEOIP,CN,🌎 全球直连,no-resolve
+  - MATCH,🐋 漏网之鱼

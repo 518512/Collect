@@ -1,6 +1,6 @@
 ## https://blog.csdn.net/Abin17618/article/details/135355114 
 ## 将此文件的中的所有内容注释掉
-nano /etc/apt/sources.list.d/pve-enterprise.list
+```nano /etc/apt/sources.list.d/pve-enterprise.list```
 
 ## 下载中科大的GPG KEY
 wget https://mirrors.ustc.edu.cn/proxmox/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
